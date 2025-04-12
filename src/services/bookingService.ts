@@ -187,8 +187,8 @@ async function createBookingApprovalNotification(bookingId: string, bookingDetai
     const notification = {
       userId: bookingDetails.startupId?.toString() || 'unknown',
       type: 'booking-approved',
-      title: 'Booking Approved',
-      message: `Your booking for "${bookingDetails.facilityName}" has been approved.`,
+      title: 'New Booking Approved',
+      message: `${bookingDetails.facilityName} was booked by ${bookingDetails.startupName} from ${formatDate(bookingDetails.startDate)} to ${formatDate(bookingDetails.endDate)}`,
       relatedId: bookingId,
       relatedType: 'booking',
       isRead: false,
@@ -235,9 +235,57 @@ async function fetchBookingDetails(bookingId: string): Promise<BookingDetails> {
     });
     
     // Get startup details
-    const startup = await db.collection('Startups').findOne({
-      _id: new ObjectId(booking.startupId)
-    });
+    let startup = null;
+    
+    // First try the standard way with startupId
+    if (booking.startupId && ObjectId.isValid(booking.startupId)) {
+      console.log(`[BookingService] Looking up startup with ID: ${booking.startupId}`);
+      startup = await db.collection('Startups').findOne({
+        _id: new ObjectId(booking.startupId)
+      });
+    } else {
+      console.log(`[BookingService] No valid startupId in booking: ${JSON.stringify(booking.startupId)}`);
+    }
+    
+    // If startup not found by startupId, try to find it by userId
+    if (!startup && booking.userId && ObjectId.isValid(booking.userId)) {
+      console.log(`[BookingService] Attempting to find startup by booking.userId: ${booking.userId}`);
+      startup = await db.collection('Startups').findOne({
+        userId: new ObjectId(booking.userId)
+      });
+      if (startup) {
+        console.log(`[BookingService] Found startup by booking.userId: ${startup.startupName}`);
+      }
+    }
+    
+    // If still not found, try the direct startupId as userId (important connection in your schema)
+    if (!startup && booking.startupId && ObjectId.isValid(booking.startupId)) {
+      console.log(`[BookingService] Trying startupId as userId: ${booking.startupId}`);
+      startup = await db.collection('Startups').findOne({
+        userId: new ObjectId(booking.startupId)
+      });
+      if (startup) {
+        console.log(`[BookingService] Found startup using startupId as userId: ${startup.startupName}`);
+      }
+    }
+    
+    // If we still don't have a startup, try to fetch all startups to debug
+    if (!startup) {
+      console.log(`[BookingService] WARNING: Failed to find startup by any method`);
+      console.log(`[BookingService] Last resort: checking if ANY startups exist in the database`);
+      const startupCount = await db.collection('Startups').countDocuments({});
+      console.log(`[BookingService] Found ${startupCount} startups in the database`);
+      
+      // Get a sample startup for debugging
+      if (startupCount > 0) {
+        const sampleStartup = await db.collection('Startups').findOne({});
+        if (sampleStartup) {
+          console.log(`[BookingService] Sample startup structure: userId=${sampleStartup.userId}, _id=${sampleStartup._id}`);
+        }
+      }
+    } else {
+      console.log(`[BookingService] Found startup: ${startup.startupName}`);
+    }
     
     const bookingDetails = {
       ...booking,
@@ -249,6 +297,7 @@ async function fetchBookingDetails(bookingId: string): Promise<BookingDetails> {
     };
     
     console.log(`[BookingService] Successfully fetched booking details`);
+    console.log(`[BookingService] Final startupName: ${bookingDetails.startupName}`);
     return bookingDetails;
   } catch (error) {
     console.error('[BookingService] Error fetching booking details:', error);
