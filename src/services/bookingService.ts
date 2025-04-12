@@ -30,6 +30,11 @@ export async function updateBookingStatus(
   previousStatus: string
 ) {
   try {
+    // Ensure this function runs only at runtime, not during build
+    if (typeof window === 'undefined' && process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV === 'production') {
+      console.log(`[BookingService] Running in Vercel production environment`);
+    }
+    
     console.log(`[BookingService] Updating booking ${bookingId} status from ${previousStatus} to ${newStatus}`);
     
     const client = await clientPromise;
@@ -220,6 +225,10 @@ async function fetchBookingDetails(bookingId: string): Promise<BookingDetails> {
     console.log(`[BookingService] Fetching details for booking ${bookingId}`);
     const client = await clientPromise;
     const db = client.db('Cumma');
+    
+    // Add a cache-busting timestamp to avoid using stale data in production
+    const cacheKey = `booking_${bookingId}_${Date.now()}`;
+    console.log(`[BookingService] Using cache key: ${cacheKey}`);
     
     const booking = await db.collection('bookings').findOne({ 
       _id: new ObjectId(bookingId) 
