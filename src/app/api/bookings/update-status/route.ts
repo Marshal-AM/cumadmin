@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { updateBookingStatus } from '@/services/bookingService'
 
+// Add export configuration to disable static optimization for this route
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 export async function POST(request: Request) {
   try {
     const requestData = await request.json()
