@@ -30,7 +30,8 @@ export default function StatusActions({ bookingId, status }: StatusActionsProps)
     const requestData = {
       bookingId,
       status: newStatus,
-      previousStatus: status
+      previousStatus: status,
+      timestamp: Date.now() // Add timestamp to ensure request is not cached
     }
     
     console.log(`[StatusActions] Sending request data:`, requestData)
@@ -38,8 +39,13 @@ export default function StatusActions({ bookingId, status }: StatusActionsProps)
     try {
       const res = await fetch('/api/bookings/update-status', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestData)
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache'
+        },
+        body: JSON.stringify(requestData),
+        cache: 'no-store'
       })
       
       if (res.ok) {
